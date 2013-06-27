@@ -25,6 +25,7 @@ import cherrypy
 import logging
 import re
 import urllib
+import struct, socket
 from xml.sax.saxutils import escape
 
 from sabnzbd.utils.rsslib import RSS, Item
@@ -147,6 +148,60 @@ def get_users():
 def encrypt_pwd(pwd):
     return pwd
 
+def set_whitelist(cherrypy):
+    """ Set up the whitelist
+    """
+    def addressInNetwork(ip,net):
+        """Is an address in a network. 
+           Returns: 
+              True - If 'ip' is an address in 'net' which is a string in the format x.x.x.x/y
+              False - If 'ip' not in 'net' or if there is an error."""
+        
+        if net == "":
+            return False
+        
+        try:
+            ipaddr = struct.unpack('>L',socket.inet_aton(ip))[0]
+            netaddr,bits = net.split('/')
+            ipnet = struct.unpack('>L',socket.inet_aton(netaddr))[0]
+            mask = ((2L<<(int(bits))-1) - 1)<<(32-int(bits))
+
+            return ipaddr & mask == ipnet & mask
+        except ValueError: # Will get here if whitelist is incorrectly formatted
+            logging.warning(u'Configuration Error: \'whitelist\' option is malformed. Value: %s, assuming no whitelisted hosts until restart.' % net )
+            
+            return False
+
+    def check_ip():
+        """Will check current request address against 'ip_whitelist' and will disable authentication with those that match. 'ip_whitelist' is a list in the form of 'a.a.a.a/b[,c.c.c.c/d]'"""
+        try:
+             # Iterate through whitelisted networks
+            for whitelist_network in cfg.whitelist().split(','): 
+                    # Check if current network matches remote address
+                    if addressInNetwork(cherrypy.request.remote.ip, whitelist_network.strip()):
+                        cherrypy.request.login = "admin"
+                        # Search for and remove basic_auth hook from list of hooks to execute
+                        old_hooks = cherrypy.request.hooks['before_handler']
+                        new_hooks = []
+                        for hook in old_hooks:
+                                if hook.callback != cherrypy.lib.auth.basic_auth:
+                                        new_hooks.append(hook)
+
+                        cherrypy.request.hooks['before_handler'] = new_hooks
+                        
+                        # No need to continue checking if already matched once
+                        return True 
+        except Exception:
+            logging.warning(u'webserverInit.py:check_ip() - Error while processing whitelist. ip_whitelist = %s' % cfg.whitelist())
+
+        return True
+
+    if cfg.whitelist():
+        checkipaddress = cherrypy.Tool('on_start_resource', check_ip, 1)
+        cherrypy.tools.checkipaddress = checkipaddress
+        
+        cherrypy.config.update({ 'tools.checkipaddress.on': True })
+        
 
 def set_auth(conf):
     """ Set the authentication for CherryPy

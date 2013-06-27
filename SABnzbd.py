@@ -1523,6 +1523,7 @@ def main():
     cherrypy.tree.mount(login_page, '/', config=appconfig)
 
     # Set authentication for CherryPy
+    sabnzbd.interface.set_whitelist(cherrypy)
     sabnzbd.interface.set_auth(cherrypy.config)
 
     logging.info('Starting web-interface on %s:%s', cherryhost, cherryport)

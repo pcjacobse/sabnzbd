@@ -228,6 +228,7 @@ web_color = OptionStr('misc', 'web_color', '')
 web_color2 = OptionStr('misc', 'web_color2')
 cleanup_list = OptionList('misc', 'cleanup_list')
 warned_old_queue = OptionBool('misc', 'warned_old_queue', False)
+whitelist = OptionStr('misc', 'whitelist')
 
 unwanted_extensions = OptionList('misc', 'unwanted_extensions')
 action_on_unwanted_extensions = OptionNumber('misc', 'action_on_unwanted_extensions', 0)
